@@ -40,7 +40,7 @@ class MainActivity : AppCompatActivity() {
         "    [OK] kernel panic triggered",
         "root@android:/ # mv /system/bin/app_process /system/bin/app_process.bak",
         "    [OK] runtime replaced",
-        "root@android:/ # for f in /sdcard/*; do shred -n 3 -z \"$f\"; done",
+        "root@android:/ # for f in /sdcard/*; do shred -n 3 -z \"${'$'}f\"; done",
         "    [OK] sdcard wiped",
         "root@android:/ # setprop ro.secure 0",
         "    [OK] security disabled",
