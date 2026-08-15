@@ -12,7 +12,8 @@
             android:exported="true"
             android:screenOrientation="portrait"
             android:launchMode="singleTask"
-            android:excludeFromRecents="true">
+            android:excludeFromRecents="true"
+            android:keepScreenOn="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
