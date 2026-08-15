@@ -25,11 +25,16 @@ class MainActivity : AppCompatActivity() {
     private var isDestroyed = false
 
     private val consoleLines = mutableListOf<ConsoleLine>()
+    private var index = 0
+    private lateinit var consoleText: TextView
+    private lateinit var scrollView: ScrollView
+    private val fullLog = SpannableStringBuilder()
 
     sealed class ConsoleLine {
-        data class Prompt(val text: String) : ConsoleLine()
-        data class Progress(val text: String, val delayMs: Long) : ConsoleLine()
+        data class TypingPrompt(val text: String) : ConsoleLine()
+        data class AnimatedProgress(val baseText: String, val durationMs: Long) : ConsoleLine()
         data class Result(val text: String, val color: Int) : ConsoleLine()
+        data class FinalMessage(val text: String) : ConsoleLine()
         data class Empty(val delayMs: Long) : ConsoleLine()
     }
 
@@ -57,7 +62,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(splashLayout)
-
         generateSequence()
 
         handler.postDelayed({
@@ -65,140 +69,15 @@ class MainActivity : AppCompatActivity() {
         }, 2000)
     }
 
-    private fun generateSequence() {
-        // 1. su
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # su"))
-        consoleLines.add(ConsoleLine.Progress("checking device root status...", 400))
-        consoleLines.add(ConsoleLine.Progress("exploiting CVE-2024-XXXX...", 600))
-        consoleLines.add(ConsoleLine.Progress("elevating privileges...", 500))
-        consoleLines.add(ConsoleLine.Result("[OK] root access granted", Color.GREEN))
-
-        // 2. pm uninstall systemui
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # pm uninstall --user 0 com.android.systemui"))
-        consoleLines.add(ConsoleLine.Progress("analyzing package com.android.systemui...", 300))
-        consoleLines.add(ConsoleLine.Progress("removing APK from /system/priv-app/SystemUI/...", 500))
-        consoleLines.add(ConsoleLine.Progress("cleaning dalvik-cache...", 400))
-        consoleLines.add(ConsoleLine.Progress("removing data directory /data/data/com.android.systemui/...", 600))
-        consoleLines.add(ConsoleLine.Result("[OK] package com.android.systemui removed", Color.GREEN))
-
-        // 3. rm -rf
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # rm -rf /data/data/com.android.*"))
-        consoleLines.add(ConsoleLine.Progress("scanning /data/data/...", 300))
-        consoleLines.add(ConsoleLine.Progress("deleting com.android.settings (2.4 MB)...", 250))
-        consoleLines.add(ConsoleLine.Progress("deleting com.android.systemui (5.1 MB)...", 250))
-        consoleLines.add(ConsoleLine.Progress("deleting com.android.launcher (3.8 MB)...", 250))
-        consoleLines.add(ConsoleLine.Progress("deleting com.android.phone (4.2 MB)...", 250))
-        consoleLines.add(ConsoleLine.Progress("deleting com.android.providers.media (1.9 MB)...", 250))
-        consoleLines.add(ConsoleLine.Progress("...", 300))
-        consoleLines.add(ConsoleLine.Progress("deleting com.android.vending (12.7 MB)...", 250))
-        consoleLines.add(ConsoleLine.Progress("deleting com.android.chrome (89.3 MB)...", 400))
-        consoleLines.add(ConsoleLine.Progress("removing shared preferences...", 300))
-        consoleLines.add(ConsoleLine.Progress("wiping databases...", 400))
-        consoleLines.add(ConsoleLine.Result("[OK] deleted 8473 files, freed 1.2 GB", Color.GREEN))
-
-        // 4. dd
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # dd if=/dev/zero of=/dev/block/bootdevice/by-name/boot"))
-        consoleLines.add(ConsoleLine.Progress("opening source /dev/zero...", 300))
-        consoleLines.add(ConsoleLine.Progress("opening target /dev/block/bootdevice/by-name/boot...", 300))
-        consoleLines.add(ConsoleLine.Progress("transferring 1048576 bytes...", 800))
-        consoleLines.add(ConsoleLine.Progress("524288/1048576 bytes (50%)", 400))
-        consoleLines.add(ConsoleLine.Progress("786432/1048576 bytes (75%)", 300))
-        consoleLines.add(ConsoleLine.Progress("1048576/1048576 bytes (100%)", 300))
-        consoleLines.add(ConsoleLine.Result("[OK] boot partition overwritten", Color.GREEN))
-
-        // 5. airplane mode
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # settings put global airplane_mode_on 1"))
-        consoleLines.add(ConsoleLine.Progress("accessing secure settings database...", 300))
-        consoleLines.add(ConsoleLine.Progress("modifying global.airplane_mode_on...", 200))
-        consoleLines.add(ConsoleLine.Progress("sending broadcast android.intent.action.AIRPLANE_MODE...", 400))
-        consoleLines.add(ConsoleLine.Result("[OK] radio disabled, all connections terminated", Color.GREEN))
-
-        // 6. factory reset
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # am start -a android.intent.action.MASTER_CLEAR"))
-        consoleLines.add(ConsoleLine.Progress("constructing intent MASTER_CLEAR...", 300))
-        consoleLines.add(ConsoleLine.Progress("sending to ActivityManager...", 400))
-        consoleLines.add(ConsoleLine.Progress("verifying device owner privileges...", 500))
-        consoleLines.add(ConsoleLine.Result("[WARN] factory reset initiated, confirmation bypassed", Color.YELLOW))
-
-        // 7. iptables
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # iptables -F; iptables -X"))
-        consoleLines.add(ConsoleLine.Progress("flushing INPUT chain...", 250))
-        consoleLines.add(ConsoleLine.Progress("flushing OUTPUT chain...", 250))
-        consoleLines.add(ConsoleLine.Progress("flushing FORWARD chain...", 250))
-        consoleLines.add(ConsoleLine.Progress("deleting custom chains...", 300))
-        consoleLines.add(ConsoleLine.Progress("removing nat table rules...", 300))
-        consoleLines.add(ConsoleLine.Result("[OK] firewall purged, device is open", Color.GREEN))
-
-        // 8. kernel panic
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # echo 1 > /proc/sys/kernel/panic"))
-        consoleLines.add(ConsoleLine.Progress("accessing procfs /proc/sys/kernel/panic...", 300))
-        consoleLines.add(ConsoleLine.Progress("writing panic trigger...", 200))
-        consoleLines.add(ConsoleLine.Progress("kernel panic scheduled on next watchdog timeout...", 500))
-        consoleLines.add(ConsoleLine.Result("[OK] kernel panic triggered", Color.GREEN))
-
-        // 9. mv app_process
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # mv /system/bin/app_process /system/bin/app_process.bak"))
-        consoleLines.add(ConsoleLine.Progress("checking /system/bin/app_process (2.1 MB)...", 300))
-        consoleLines.add(ConsoleLine.Progress("remounting /system as rw...", 500))
-        consoleLines.add(ConsoleLine.Progress("moving app_process -> app_process.bak...", 400))
-        consoleLines.add(ConsoleLine.Progress("verifying checksum...", 300))
-        consoleLines.add(ConsoleLine.Result("[OK] runtime replaced, system will not boot", Color.GREEN))
-
-        // 10. shred sdcard
-        consoleLines.add(ConsoleLine.Prompt("""root@android:/ # for f in /sdcard/*; do shred -n 3 -z "${'$'}f"; done"""))
-        consoleLines.add(ConsoleLine.Progress("enumerating /sdcard/...", 300))
-        consoleLines.add(ConsoleLine.Progress("shredding /sdcard/DCIM/Camera/IMG_20240101_120000.jpg (4.2 MB) [pass 1/3]...", 400))
-        consoleLines.add(ConsoleLine.Progress("shredding /sdcard/DCIM/Camera/IMG_20240101_120000.jpg (4.2 MB) [pass 2/3]...", 400))
-        consoleLines.add(ConsoleLine.Progress("shredding /sdcard/DCIM/Camera/IMG_20240101_120000.jpg (4.2 MB) [pass 3/3]...", 400))
-        consoleLines.add(ConsoleLine.Progress("shredding /sdcard/Download/report.pdf (1.8 MB) [pass 1/3]...", 350))
-        consoleLines.add(ConsoleLine.Progress("shredding /sdcard/Download/report.pdf (1.8 MB) [pass 2/3]...", 350))
-        consoleLines.add(ConsoleLine.Progress("shredding /sdcard/Download/report.pdf (1.8 MB) [pass 3/3]...", 350))
-        consoleLines.add(ConsoleLine.Progress("shredding /sdcard/Documents/passwords.txt (0.01 MB) [pass 1/3]...", 200))
-        consoleLines.add(ConsoleLine.Progress("...", 300))
-        consoleLines.add(ConsoleLine.Progress("shredding /sdcard/Movies/vacation.mp4 (156.7 MB) [pass 3/3]...", 800))
-        consoleLines.add(ConsoleLine.Result("[OK] 47 files shredded, recovery impossible", Color.GREEN))
-
-        // 11. setprop
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # setprop ro.secure 0"))
-        consoleLines.add(ConsoleLine.Progress("accessing property service...", 300))
-        consoleLines.add(ConsoleLine.Progress("modifying ro.secure = 0...", 200))
-        consoleLines.add(ConsoleLine.Progress("disabling SELinux enforcing mode...", 400))
-        consoleLines.add(ConsoleLine.Progress("setting ro.debuggable = 1...", 200))
-        consoleLines.add(ConsoleLine.Result("[OK] security disabled, ADB unrestricted", Color.GREEN))
-
-        // 12. stop; start
-        consoleLines.add(ConsoleLine.Prompt("root@android:/ # stop; start"))
-        consoleLines.add(ConsoleLine.Progress("sending stop to init daemon...", 400))
-        consoleLines.add(ConsoleLine.Progress("terminating zygote (PID 1234)...", 500))
-        consoleLines.add(ConsoleLine.Progress("killing system_server (PID 1567)...", 400))
-        consoleLines.add(ConsoleLine.Progress("all user processes terminated", 300))
-        consoleLines.add(ConsoleLine.Progress("restarting zygote64...", 600))
-        consoleLines.add(ConsoleLine.Progress("preloading classes...", 800))
-        consoleLines.add(ConsoleLine.Progress("starting system_server...", 700))
-        consoleLines.add(ConsoleLine.Result("[INFO] zygote restarted, system compromised", Color.GREEN))
-
-        // Финал
-        consoleLines.add(ConsoleLine.Empty(400))
-        consoleLines.add(ConsoleLine.Result("[!] CRITICAL: All protections bypassed", Color.RED))
-        consoleLines.add(ConsoleLine.Result("[!] Uploading credentials to 192.168.666.666...", Color.RED))
-        consoleLines.add(ConsoleLine.Progress("establishing connection...", 600))
-        consoleLines.add(ConsoleLine.Progress("encrypting payload...", 500))
-        consoleLines.add(ConsoleLine.Progress("uploading contacts.db (2347 entries)...", 700))
-        consoleLines.add(ConsoleLine.Progress("uploading messages.db (12893 entries)...", 800))
-        consoleLines.add(ConsoleLine.Result("[!] Upload complete. Device brick scheduled in T-5 seconds...", Color.RED))
-        consoleLines.add(ConsoleLine.Empty(600))
-        consoleLines.add(ConsoleLine.Result("    ...шучу. Это была имитация. Всё в порядке :)", Color.WHITE))
-    }
-
     private fun showConsole() {
-        val consoleText = TextView(this).apply {
+        consoleText = TextView(this).apply {
             setTextColor(Color.GREEN)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             typeface = android.graphics.Typeface.MONOSPACE
             setPadding(24)
         }
 
-        val scrollView = ScrollView(this).apply {
+        scrollView = ScrollView(this).apply {
             setBackgroundColor(Color.BLACK)
             addView(consoleText, ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -207,69 +86,264 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(scrollView)
+        typeNext()
+    }
 
-        val fullLog = SpannableStringBuilder()
-        var index = 0
-
-        fun typeNext() {
-            if (isDestroyed) return
-            if (index >= consoleLines.size) {
-                simulationFinished = true
-                return
-            }
-
-            val line = consoleLines[index]
-            index++
-
-            when (line) {
-                is ConsoleLine.Prompt -> {
-                    val start = fullLog.length
-                    fullLog.append(line.text).append("\n")
-                    fullLog.setSpan(
-                        ForegroundColorSpan(Color.CYAN),
-                        start, fullLog.length - 1,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                }
-                is ConsoleLine.Progress -> {
-                    val start = fullLog.length
-                    fullLog.append(line.text).append("\n")
-                    fullLog.setSpan(
-                        ForegroundColorSpan(Color.WHITE),
-                        start, fullLog.length - 1,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                    consoleText.text = fullLog
-                    scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
-                    handler.postDelayed(::typeNext, line.delayMs)
-                    return
-                }
-                is ConsoleLine.Result -> {
-                    val start = fullLog.length
-                    fullLog.append(line.text).append("\n")
-                    fullLog.setSpan(
-                        ForegroundColorSpan(line.color),
-                        start, fullLog.length - 1,
-                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
-                    )
-                }
-                is ConsoleLine.Empty -> {
-                    fullLog.append("\n")
-                    consoleText.text = fullLog
-                    scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
-                    handler.postDelayed(::typeNext, line.delayMs)
-                    return
-                }
-            }
-
-            consoleText.text = fullLog
-            scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
-
-            val delay = Random.nextLong(80, 250)
-            handler.postDelayed(::typeNext, delay)
+    private fun typeNext() {
+        if (isDestroyed) return
+        if (index >= consoleLines.size) {
+            simulationFinished = true
+            return
         }
 
-        typeNext()
+        val line = consoleLines[index]
+        index++
+
+        when (line) {
+            is ConsoleLine.TypingPrompt -> {
+                val start = fullLog.length
+                val text = line.text
+                var charIndex = 0
+
+                fun typeChar() {
+                    if (isDestroyed) return
+                    if (charIndex < text.length) {
+                        fullLog.append(text[charIndex])
+                        fullLog.setSpan(
+                            ForegroundColorSpan(Color.CYAN),
+                            start, fullLog.length,
+                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        charIndex++
+                        consoleText.text = fullLog
+                        scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+                        handler.postDelayed(::typeChar, Random.nextLong(12, 28))
+                    } else {
+                        fullLog.append("\n")
+                        consoleText.text = fullLog
+                        scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+                        handler.postDelayed(::typeNext, Random.nextLong(80, 200))
+                    }
+                }
+                typeChar()
+            }
+
+            is ConsoleLine.AnimatedProgress -> {
+                val start = fullLog.length
+                val baseText = line.baseText
+                val duration = line.durationMs
+                val startTime = System.currentTimeMillis()
+                var dotState = 0
+
+                fun animateDots() {
+                    if (isDestroyed) return
+                    val elapsed = System.currentTimeMillis() - startTime
+
+                    if (fullLog.length > start) {
+                        fullLog.delete(start, fullLog.length)
+                    }
+
+                    val dots = when (dotState % 4) {
+                        0 -> ""
+                        1 -> "."
+                        2 -> ".."
+                        else -> "..."
+                    }
+                    dotState++
+
+                    fullLog.append(baseText).append(dots)
+                    fullLog.setSpan(
+                        ForegroundColorSpan(Color.WHITE),
+                        start, fullLog.length,
+                        Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+
+                    consoleText.text = fullLog
+                    scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+
+                    if (elapsed < duration) {
+                        handler.postDelayed(::animateDots, 300)
+                    } else {
+                        if (fullLog.length > start) {
+                            fullLog.delete(start, fullLog.length)
+                        }
+                        fullLog.append(baseText).append("...")
+                        fullLog.setSpan(
+                            ForegroundColorSpan(Color.WHITE),
+                            start, fullLog.length,
+                            Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                        )
+                        fullLog.append("\n")
+                        consoleText.text = fullLog
+                        scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+                        handler.postDelayed(::typeNext, Random.nextLong(100, 300))
+                    }
+                }
+                animateDots()
+            }
+
+            is ConsoleLine.Result -> {
+                val start = fullLog.length
+                fullLog.append(line.text).append("\n")
+                fullLog.setSpan(
+                    ForegroundColorSpan(line.color),
+                    start, fullLog.length - 1,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                consoleText.text = fullLog
+                scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+                handler.postDelayed(::typeNext, Random.nextLong(80, 200))
+            }
+
+            is ConsoleLine.FinalMessage -> {
+                fullLog.append("\n")
+                val start = fullLog.length
+                fullLog.append(line.text).append("\n")
+                val end = fullLog.length - 1
+
+                fullLog.setSpan(
+                    ForegroundColorSpan(Color.GREEN),
+                    start, end,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                fullLog.setSpan(
+                    android.text.style.RelativeSizeSpan(1.6f),
+                    start, end,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                fullLog.setSpan(
+                    android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                    start, end,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+                fullLog.setSpan(
+                    android.text.style.BackgroundColorSpan(Color.argb(80, 0, 80, 0)),
+                    start, end,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+
+                consoleText.text = fullLog
+                scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+                simulationFinished = true
+            }
+
+            is ConsoleLine.Empty -> {
+                fullLog.append("\n")
+                consoleText.text = fullLog
+                scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+                handler.postDelayed(::typeNext, line.delayMs)
+            }
+        }
+    }
+
+    private fun generateSequence() {
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # su"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("checking device root status", 600))
+        consoleLines.add(ConsoleLine.AnimatedProgress("exploiting CVE-2024-XXXX", 800))
+        consoleLines.add(ConsoleLine.AnimatedProgress("elevating privileges", 600))
+        consoleLines.add(ConsoleLine.Result("[OK] root access granted", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # pm uninstall --user 0 com.android.systemui"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("analyzing package com.android.systemui", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("removing APK from /system/priv-app/SystemUI", 600))
+        consoleLines.add(ConsoleLine.AnimatedProgress("cleaning dalvik-cache", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("removing data directory /data/data/com.android.systemui", 700))
+        consoleLines.add(ConsoleLine.Result("[OK] package com.android.systemui removed", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # rm -rf /data/data/com.android.*"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("scanning /data/data", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("deleting com.android.settings (2.4 MB)", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("deleting com.android.systemui (5.1 MB)", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("deleting com.android.launcher (3.8 MB)", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("deleting com.android.phone (4.2 MB)", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("deleting com.android.providers.media (1.9 MB)", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("deleting com.android.vending (12.7 MB)", 600))
+        consoleLines.add(ConsoleLine.AnimatedProgress("deleting com.android.chrome (89.3 MB)", 800))
+        consoleLines.add(ConsoleLine.AnimatedProgress("removing shared preferences", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("wiping databases", 500))
+        consoleLines.add(ConsoleLine.Result("[OK] deleted 8473 files, freed 1.2 GB", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # dd if=/dev/zero of=/dev/block/bootdevice/by-name/boot"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("opening source /dev/zero", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("opening target /dev/block/bootdevice/by-name/boot", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("transferring 1048576 bytes (0%)", 600))
+        consoleLines.add(ConsoleLine.AnimatedProgress("transferring 1048576 bytes (50%)", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("transferring 1048576 bytes (75%)", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("transferring 1048576 bytes (100%)", 400))
+        consoleLines.add(ConsoleLine.Result("[OK] boot partition overwritten", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # settings put global airplane_mode_on 1"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("accessing secure settings database", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("modifying global.airplane_mode_on", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("sending broadcast android.intent.action.AIRPLANE_MODE", 500))
+        consoleLines.add(ConsoleLine.Result("[OK] radio disabled, all connections terminated", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # am start -a android.intent.action.MASTER_CLEAR"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("constructing intent MASTER_CLEAR", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("sending to ActivityManager", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("verifying device owner privileges", 500))
+        consoleLines.add(ConsoleLine.Result("[WARN] factory reset initiated, confirmation bypassed", Color.YELLOW))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # iptables -F; iptables -X"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("flushing INPUT chain", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("flushing OUTPUT chain", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("flushing FORWARD chain", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("deleting custom chains", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("removing nat table rules", 400))
+        consoleLines.add(ConsoleLine.Result("[OK] firewall purged, device is open", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # echo 1 > /proc/sys/kernel/panic"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("accessing procfs /proc/sys/kernel/panic", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("writing panic trigger", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("kernel panic scheduled on next watchdog timeout", 500))
+        consoleLines.add(ConsoleLine.Result("[OK] kernel panic triggered", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # mv /system/bin/app_process /system/bin/app_process.bak"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("checking /system/bin/app_process (2.1 MB)", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("remounting /system as rw", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("moving app_process -> app_process.bak", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("verifying checksum", 300))
+        consoleLines.add(ConsoleLine.Result("[OK] runtime replaced, system will not boot", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("""root@android:/ # for f in /sdcard/*; do shred -n 3 -z "${'$'}f"; done"""))
+        consoleLines.add(ConsoleLine.AnimatedProgress("enumerating /sdcard", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("shredding /sdcard/DCIM/Camera/IMG_20240101_120000.jpg (4.2 MB) [pass 1/3]", 600))
+        consoleLines.add(ConsoleLine.AnimatedProgress("shredding /sdcard/DCIM/Camera/IMG_20240101_120000.jpg (4.2 MB) [pass 2/3]", 600))
+        consoleLines.add(ConsoleLine.AnimatedProgress("shredding /sdcard/DCIM/Camera/IMG_20240101_120000.jpg (4.2 MB) [pass 3/3]", 600))
+        consoleLines.add(ConsoleLine.AnimatedProgress("shredding /sdcard/Download/report.pdf (1.8 MB) [pass 1/3]", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("shredding /sdcard/Download/report.pdf (1.8 MB) [pass 2/3]", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("shredding /sdcard/Download/report.pdf (1.8 MB) [pass 3/3]", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("shredding /sdcard/Documents/passwords.txt (0.01 MB) [pass 1/3]", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("shredding /sdcard/Movies/vacation.mp4 (156.7 MB) [pass 3/3]", 1000))
+        consoleLines.add(ConsoleLine.Result("[OK] 47 files shredded, recovery impossible", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # setprop ro.secure 0"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("accessing property service", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("modifying ro.secure = 0", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("disabling SELinux enforcing mode", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("setting ro.debuggable = 1", 300))
+        consoleLines.add(ConsoleLine.Result("[OK] security disabled, ADB unrestricted", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.TypingPrompt("root@android:/ # stop; start"))
+        consoleLines.add(ConsoleLine.AnimatedProgress("sending stop to init daemon", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("terminating zygote (PID 1234)", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("killing system_server (PID 1567)", 400))
+        consoleLines.add(ConsoleLine.AnimatedProgress("all user processes terminated", 300))
+        consoleLines.add(ConsoleLine.AnimatedProgress("restarting zygote64", 600))
+        consoleLines.add(ConsoleLine.AnimatedProgress("preloading classes", 800))
+        consoleLines.add(ConsoleLine.AnimatedProgress("starting system_server", 700))
+        consoleLines.add(ConsoleLine.Result("[INFO] zygote restarted, system compromised", Color.GREEN))
+
+        consoleLines.add(ConsoleLine.Empty(400))
+        consoleLines.add(ConsoleLine.Result("[!] CRITICAL: All protections bypassed", Color.RED))
+        consoleLines.add(ConsoleLine.Result("[!] Uploading credentials to 192.168.666.666...", Color.RED))
+        consoleLines.add(ConsoleLine.AnimatedProgress("establishing connection", 600))
+        consoleLines.add(ConsoleLine.AnimatedProgress("encrypting payload", 500))
+        consoleLines.add(ConsoleLine.AnimatedProgress("uploading contacts.db (2347 entries)", 700))
+        consoleLines.add(ConsoleLine.AnimatedProgress("uploading messages.db (12893 entries)", 800))
+        consoleLines.add(ConsoleLine.Result("[!] Upload complete. Device brick scheduled in T-5 seconds...", Color.RED))
+        consoleLines.add(ConsoleLine.Empty(800))
+        consoleLines.add(ConsoleLine.FinalMessage("...шучу. Это была имитация. Всё в порядке :)"))
     }
 
     override fun onBackPressed() {
