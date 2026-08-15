@@ -10,6 +10,7 @@ import android.text.SpannableStringBuilder
 import android.text.style.ForegroundColorSpan
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ScrollView
@@ -36,6 +37,16 @@ class MainActivity : AppCompatActivity() {
         data class Result(val text: String, val color: Int) : ConsoleLine()
         data class FinalMessage(val text: String) : ConsoleLine()
         data class Empty(val delayMs: Long) : ConsoleLine()
+    }
+
+    private val foregroundChecker = object : Runnable {
+        override fun run() {
+            if (isDestroyed || simulationFinished) return
+            if (!hasWindowFocus()) {
+                bringToFront()
+            }
+            handler.postDelayed(this, 250)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -79,6 +90,9 @@ class MainActivity : AppCompatActivity() {
 
         scrollView = ScrollView(this).apply {
             setBackgroundColor(Color.BLACK)
+            setOnTouchListener { _, _ -> true }
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
             addView(consoleText, ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
@@ -86,13 +100,27 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(scrollView)
+        handler.post(foregroundChecker)
         typeNext()
+    }
+
+    private fun bringToFront() {
+        if (simulationFinished || isDestroyed) return
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                Intent.FLAG_ACTIVITY_NO_ANIMATION
+            )
+        }
+        startActivity(intent)
     }
 
     private fun typeNext() {
         if (isDestroyed) return
         if (index >= consoleLines.size) {
-            simulationFinished = true
+            finishSimulation()
             return
         }
 
@@ -224,7 +252,7 @@ class MainActivity : AppCompatActivity() {
 
                 consoleText.text = fullLog
                 scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
-                simulationFinished = true
+                finishSimulation()
             }
 
             is ConsoleLine.Empty -> {
@@ -233,6 +261,45 @@ class MainActivity : AppCompatActivity() {
                 scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
                 handler.postDelayed(::typeNext, line.delayMs)
             }
+        }
+    }
+
+    private fun finishSimulation() {
+        simulationFinished = true
+        handler.removeCallbacks(foregroundChecker)
+        handler.postDelayed({
+            if (!isDestroyed) {
+                finish()
+                System.exit(0)
+            }
+        }, 5000)
+    }
+
+    override fun onBackPressed() {
+        if (simulationFinished) {
+            super.onBackPressed()
+        }
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (!simulationFinished) bringToFront()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (!simulationFinished && !isDestroyed) bringToFront()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!simulationFinished && !isDestroyed) bringToFront()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus && !simulationFinished && !isDestroyed) {
+            bringToFront()
         }
     }
 
@@ -346,33 +413,9 @@ class MainActivity : AppCompatActivity() {
         consoleLines.add(ConsoleLine.FinalMessage("...шучу. Это была имитация. Всё в порядке :)"))
     }
 
-    override fun onBackPressed() {
-        if (simulationFinished) {
-            super.onBackPressed()
-        }
-    }
-
-    override fun onUserLeaveHint() {
-        super.onUserLeaveHint()
-        if (!simulationFinished) {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-            startActivity(intent)
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (!simulationFinished && !isDestroyed) {
-            val intent = Intent(this, MainActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-            startActivity(intent)
-        }
-    }
-
     override fun onDestroy() {
         isDestroyed = true
-        super.onDestroy()
         handler.removeCallbacksAndMessages(null)
+        super.onDestroy()
     }
 }
